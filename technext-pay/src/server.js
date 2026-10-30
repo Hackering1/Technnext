@@ -16,19 +16,27 @@ import { getProviderAccount, fetchRazorpayPayment } from './providers.js';
 import { createOrder, getOrderForTenant, markPaidFromProvider } from './order-service.js';
 import { handleProviderWebhook } from './webhooks.js';
 import { safeEqual } from './crypto.js';
+import { createCheckoutToken, readCheckoutToken } from './checkout-token.js';
 
-const logger = pino({ level: process.env.LOG_LEVEL || 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] });
+const logger = pino({ level: process.env.LOG_LEVEL || 'info', redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.x-checkout-token'] });
 const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 2, enableReadyCheck: true });
 const app = express();
+const checkoutLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 30,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix: 'tnp:checkout:' })
+});
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 if (config.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
-app.use(pinoHttp({ logger, genReqId: (req) => req.get('x-request-id') || randomUUID(), redact: ['req.headers.authorization', 'req.headers.cookie'] }));
+app.use(pinoHttp({ logger, genReqId: (req) => req.get('x-request-id') || randomUUID(), redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.x-checkout-token'] }));
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
 app.use(cors({ origin(origin, callback) {
   if (!origin || config.allowedOrigins.includes(origin)) return callback(null, true);
   return callback(Object.assign(new Error('Origin is not allowed'), { status: 403, code: 'origin_not_allowed' }));
-}, methods: ['GET', 'POST'], allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id'] }));
+}, methods: ['GET', 'POST'], allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Request-Id', 'X-Checkout-Token'] }));
 app.use((req, res, next) => {
   if (config.NODE_ENV === 'production' && !req.secure && !req.path.startsWith('/health/')) return res.status(400).json({ error: 'https_required' });
   return next();
@@ -75,6 +83,81 @@ function validateReturnUrl(value, returnHosts) {
   return url.toString();
 }
 
+function requireCheckoutToken(req, res, next) {
+  const orderId = readCheckoutToken(req.get('x-checkout-token'));
+  if (!orderId) return res.status(401).json({ error: 'checkout_link_invalid_or_expired' });
+  req.checkoutOrderId = orderId;
+  return next();
+}
+
+async function confirmRazorpayPayment(orderId, tenantId, paymentFields) {
+  const orderResult = await pool.query(
+    `SELECT o.*, a.provider FROM payment_orders o JOIN provider_accounts a ON a.id = o.provider_account_id
+     WHERE o.id = $1 AND o.tenant_id = $2`, [orderId, tenantId]
+  );
+  const order = orderResult.rows[0];
+  if (!order || order.provider !== 'razorpay' || order.provider_order_id !== paymentFields.razorpay_order_id) {
+    throw Object.assign(new Error('Order not found'), { status: 404, code: 'order_not_found' });
+  }
+  const account = await getProviderAccount(tenantId, 'razorpay');
+  const expected = createHmac('sha256', account.credentials.keySecret)
+    .update(`${paymentFields.razorpay_order_id}|${paymentFields.razorpay_payment_id}`).digest('hex');
+  if (!safeEqual(expected, paymentFields.razorpay_signature, 'hex')) {
+    throw Object.assign(new Error('Payment signature is invalid'), { status: 400, code: 'invalid_payment_signature' });
+  }
+  const payment = await fetchRazorpayPayment(account, paymentFields.razorpay_payment_id);
+  if (payment.order_id !== order.provider_order_id || payment.status !== 'captured' || Number(payment.amount) !== Number(order.amount_minor) || payment.currency !== order.currency) {
+    throw Object.assign(new Error('Payment is not captured or does not match this order'), { status: 409, code: 'payment_not_captured_or_mismatch' });
+  }
+  await markPaidFromProvider({ orderId: order.id, provider: 'razorpay', providerAccountId: order.provider_account_id, amountMinor: payment.amount, currency: payment.currency, source: 'checkout_confirmation' });
+  return { orderId: order.id, status: 'PAID' };
+}
+
+app.get('/public/checkout', checkoutLimiter, requireCheckoutToken, async (req, res, next) => {
+  try {
+    const found = await pool.query(
+      `SELECT o.id, o.tenant_id, o.merchant_order_id, o.amount_minor, o.currency, o.status,
+              o.checkout_data, o.return_url, a.provider, a.environment, t.name AS merchant_name
+       FROM payment_orders o
+       JOIN provider_accounts a ON a.id = o.provider_account_id
+       JOIN tenants t ON t.id = o.tenant_id
+       WHERE o.id = $1 AND t.active = TRUE`, [req.checkoutOrderId]
+    );
+    if (!found.rows[0]) return res.status(404).json({ error: 'order_not_found' });
+    const row = found.rows[0];
+    const current = row.status === 'PENDING'
+      ? await getOrderForTenant({ id: row.tenant_id }, row.id)
+      : row;
+    res.set('Cache-Control', 'no-store');
+    return res.json({
+      orderId: row.id,
+      merchantOrderId: row.merchant_order_id,
+      amountMinor: Number(row.amount_minor),
+      currency: row.currency,
+      status: current?.status || row.status,
+      provider: row.provider,
+      environment: row.environment,
+      merchantName: row.merchant_name,
+      checkout: row.checkout_data,
+      returnUrl: row.return_url
+    });
+  } catch (error) { return next(error); }
+});
+
+app.post('/public/checkout/confirm', checkoutLimiter, requireCheckoutToken, async (req, res, next) => {
+  try {
+    const parsed = z.object({
+      razorpay_order_id: z.string().min(1),
+      razorpay_payment_id: z.string().min(1),
+      razorpay_signature: z.string().min(1)
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_request' });
+    const found = await pool.query('SELECT tenant_id FROM payment_orders WHERE id = $1', [req.checkoutOrderId]);
+    if (!found.rows[0]) return res.status(404).json({ error: 'order_not_found' });
+    return res.json(await confirmRazorpayPayment(req.checkoutOrderId, found.rows[0].tenant_id, parsed.data));
+  } catch (error) { return next(error); }
+});
+
 app.post('/v1/orders', async (req, res, next) => {
   try {
     const parsed = orderInput.safeParse(req.body);
@@ -91,7 +174,8 @@ app.post('/v1/orders', async (req, res, next) => {
       currency: parsed.data.currency,
       customer: { ...parsed.data.customer, orderRef: parsed.data.merchantOrderId },
       returnUrl,
-      publicBaseUrl: config.PUBLIC_BASE_URL.replace(/\/$/, '')
+      publicBaseUrl: config.PUBLIC_BASE_URL.replace(/\/$/, ''),
+      frontendBaseUrl: config.FRONTEND_BASE_URL
     });
     if (result.conflict) return res.status(409).json({ error: 'order_creation_in_progress', orderId: result.order.id, status: result.order.status });
     return res.status(result.reused ? 200 : 201).json({
@@ -101,7 +185,8 @@ app.post('/v1/orders', async (req, res, next) => {
       currency: result.order.currency,
       provider: parsed.data.provider,
       status: result.order.status,
-      checkout: result.checkout
+      checkout: result.checkout,
+      checkoutUrl: `${config.FRONTEND_BASE_URL.replace(/\/$/, '')}/checkout.html#${createCheckoutToken(result.order.id)}`
     });
   } catch (error) { next(error); }
 });
@@ -111,21 +196,7 @@ app.post('/v1/orders/:id/confirm', async (req, res, next) => {
     if (!z.string().uuid().safeParse(req.params.id).success) return res.status(404).json({ error: 'order_not_found' });
     const body = z.object({ razorpay_order_id: z.string(), razorpay_payment_id: z.string(), razorpay_signature: z.string() }).safeParse(req.body);
     if (!body.success) return res.status(400).json({ error: 'invalid_request' });
-    const orderResult = await pool.query(
-      `SELECT o.*, a.provider FROM payment_orders o JOIN provider_accounts a ON a.id = o.provider_account_id
-       WHERE o.id = $1 AND o.tenant_id = $2`, [req.params.id, req.tenant.id]
-    );
-    const order = orderResult.rows[0];
-    if (!order || order.provider !== 'razorpay' || order.provider_order_id !== body.data.razorpay_order_id) return res.status(404).json({ error: 'order_not_found' });
-    const account = await getProviderAccount(req.tenant.id, 'razorpay');
-    const expected = createHmac('sha256', account.credentials.keySecret).update(`${body.data.razorpay_order_id}|${body.data.razorpay_payment_id}`).digest('hex');
-    if (!safeEqual(expected, body.data.razorpay_signature, 'hex')) return res.status(400).json({ error: 'invalid_payment_signature' });
-    const payment = await fetchRazorpayPayment(account, body.data.razorpay_payment_id);
-    if (payment.order_id !== order.provider_order_id || payment.status !== 'captured' || Number(payment.amount) !== Number(order.amount_minor) || payment.currency !== order.currency) {
-      return res.status(409).json({ error: 'payment_not_captured_or_mismatch', status: order.status });
-    }
-    await markPaidFromProvider({ orderId: order.id, provider: 'razorpay', providerAccountId: order.provider_account_id, amountMinor: payment.amount, currency: payment.currency, source: 'checkout_confirmation' });
-    return res.status(200).json({ orderId: order.id, status: 'PAID' });
+    return res.json(await confirmRazorpayPayment(req.params.id, req.tenant.id, body.data));
   } catch (error) { next(error); }
 });
 
@@ -159,3 +230,4 @@ async function shutdown(signal) {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+
