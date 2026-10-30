@@ -19,9 +19,17 @@ if (!returnHosts.length) throw new Error('TENANT_RETURN_HOSTS must contain at le
 if (returnHosts.some((host) => isIP(host) || !/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(host))) {
   throw new Error('TENANT_RETURN_HOSTS must contain public DNS hostnames without ports or paths');
 }
+const webhookUrl = process.env.TENANT_WEBHOOK_URL?.trim() || null;
+if (webhookUrl) {
+  const parsedWebhook = new URL(webhookUrl);
+  if (parsedWebhook.protocol !== 'https:' || parsedWebhook.username || parsedWebhook.password || parsedWebhook.hash || parsedWebhook.search || !returnHosts.includes(parsedWebhook.hostname.toLowerCase())) {
+    throw new Error('TENANT_WEBHOOK_URL must be HTTPS and use a hostname in TENANT_RETURN_HOSTS');
+  }
+}
 const keyId = randomUUID();
 const apiKey = `tnp_live_${keyId}.${randomBytes(32).toString('base64url')}`;
 const providerId = randomUUID();
+const outboundWebhookSecret = webhookUrl ? randomBytes(32).toString('base64url') : null;
 let credentials;
 if (provider === 'razorpay') {
   credentials = { keyId: required('RAZORPAY_KEY_ID'), keySecret: required('RAZORPAY_KEY_SECRET'), webhookSecret: required('RAZORPAY_WEBHOOK_SECRET') };
@@ -35,8 +43,8 @@ try {
   try {
     await client.query('BEGIN');
     const tenant = await client.query(
-      'INSERT INTO tenants (id, slug, name, return_hosts) VALUES ($1,$2,$3,$4) RETURNING id',
-      [randomUUID(), slug, name, returnHosts]
+      'INSERT INTO tenants (id, slug, name, return_hosts, webhook_url, encrypted_webhook_secret) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+      [randomUUID(), slug, name, returnHosts, webhookUrl, outboundWebhookSecret ? seal(outboundWebhookSecret) : null]
     );
     await client.query(
       'INSERT INTO provider_accounts (id, tenant_id, provider, environment, encrypted_credentials) VALUES ($1,$2,$3,$4,$5)',
@@ -52,5 +60,8 @@ try {
   console.log(`Tenant provisioned: ${slug}`);
   console.log('Save this API key in the calling product secret manager now; it is shown only once:');
   console.log(apiKey);
+  if (outboundWebhookSecret) {
+    console.log('Save this outbound webhook secret in the product backend secret manager now; it is shown only once:');
+    console.log(outboundWebhookSecret);
+  }
 } finally { await pool.end(); }
-
