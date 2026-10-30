@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: technext-pay-test
+    runtime: docker
+    plan: free
+    dockerfilePath: ./technext-pay/Dockerfile
+    dockerContext: ./technext-pay
+    healthCheckPath: /health/ready
+    maxShutdownDelaySeconds: 30
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: PUBLIC_BASE_URL
+        fromService:
+          name: technext-pay-test
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: API_KEY_PEPPER
+        generateValue: true
+      - key: DATA_ENCRYPTION_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: technext-pay-test-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: technext-pay-test-redis
+          type: keyvalue
+          property: connectionString
+
+  - type: keyvalue
+    name: technext-pay-test-redis
+    plan: free
+    ipAllowList: []
+
+databases:
+  - name: technext-pay-test-db
+    databaseName: technext_pay
+    user: technext_pay
+    plan: free
