@@ -12,10 +12,11 @@ It does not collect or settle money itself. Configure a separate provider mercha
 - Razorpay and Cashfree webhook signature verification using the original raw request body.
 - Webhook deduplication, amount/currency matching, and monotonic paid status updates.
 - Provider-side status reconciliation for pending orders.
+- Transactional outbox for signed product webhooks, with retries and dead-letter state.
 - PostgreSQL persistence, Redis-backed request rate limiting, health checks, and graceful shutdown.
 - Return URLs restricted to each tenant's configured HTTPS host list.
 
-This is a **production foundation, not a production-certified payment system**. It has not been security reviewed or tested against your provider sandbox yet. Refunds, subscriptions/mandates, chargebacks, settlement reconciliation, merchant administration, client event delivery, audit exports, and operational dashboards are not implemented. Keep payment fulfilment disabled until the full lifecycle is tested and reviewed.
+This is a **production foundation, not a production-certified payment system**. It has not been security reviewed or tested against your provider sandbox yet. Refunds, subscriptions/mandates, chargebacks, settlement reconciliation, merchant administration, audit exports, and operational dashboards are not implemented. Keep payment fulfilment disabled until the full lifecycle is tested and reviewed.
 
 ## Regulatory and merchant boundary
 
@@ -45,8 +46,11 @@ Provide the tenant settings and credentials through your deployment secret manag
 - Razorpay: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
 - Cashfree: `CASHFREE_CLIENT_ID`, `CASHFREE_CLIENT_SECRET`, `CASHFREE_WEBHOOK_SECRET`, `CASHFREE_API_VERSION`.
 - `DATABASE_URL`, `API_KEY_PEPPER`, `DATA_ENCRYPTION_KEY`.
+- Optional `TENANT_WEBHOOK_URL` to receive signed payment status events. Its HTTPS hostname must also appear in `TENANT_RETURN_HOSTS`. Provisioning prints a separate signing secret once; save it in that product backend's secret manager.
 
 The command prints a tenant API key once. Save it in that calling product's backend secret manager. Revoke keys by setting `api_keys.revoked_at`; provision a replacement key before revoking the old one during rotation.
+
+Run a separate worker process alongside the API with `npm run worker:outbox`. It retries non-2xx/network failures with backoff and stops after 20 attempts; monitor dead-lettered rows in `outbox_events` and alert on their presence.
 
 ## API
 
@@ -91,7 +95,6 @@ Subscribe to the payment captured/paid events. Keep the body raw through signatu
 1. HRMS, astrology app, or another product backend calculates the charge and calls TechNext Pay with its tenant key and an idempotency key.
 2. The client UI launches the official Razorpay or Cashfree checkout using the returned checkout fields.
 3. The product backend receives the provider webhook directly at TechNext Pay or checks `GET /v1/orders/:id` before fulfilling access, subscriptions, reports, or invoices.
-4. Fulfilment is idempotent in the product database. A redirect or client-side callback alone never proves payment.
+4. The product backend accepts a signed TechNext Pay event or reconciles with `GET /v1/orders/:id`. Fulfilment is idempotent in the product database. A redirect or client-side callback alone never proves payment.
 
 See [the integration guide](docs/INTEGRATION.md) and [the go-live checklist](docs/GO-LIVE.md).
-
