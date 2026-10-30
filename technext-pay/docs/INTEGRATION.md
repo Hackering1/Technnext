@@ -23,10 +23,13 @@ const response = await fetch(`${process.env.TECHNEXT_PAY_URL}/v1/orders`, {
 });
 if (!response.ok) throw new Error(`TechNext Pay returned ${response.status}`);
 const order = await response.json();
-// Return only order.checkout to the product's own browser/app.
+// Return the hosted payment URL to the product browser.
+return res.json({ checkoutUrl: order.checkoutUrl });
 ```
 
-For Cashfree, pass `checkout.paymentSessionId` to the [official Cashfree JS SDK](https://www.cashfree.com/docs/payments/online/web/checkout). For Razorpay, pass `checkout.keyId` and `checkout.orderId` to [Razorpay Checkout](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/checkout-form/). Use the provider's current native SDK for mobile apps; do not build a custom card form.
+The customer sees the TechNext Pay checkout page, then completes the payment through the configured provider's official hosted flow. The page accepts UPI and any other methods enabled on that merchant's provider account. Provider secrets remain on the server, and card or UPI credentials never pass through TechNext Pay. Use the provider's native SDK for mobile apps.
+
+After the provider redirects the customer to `returnUrl`, verify the order using the API or the signed payment webhook. The browser redirect is not proof of payment. The return page receives `technext_order_id`, `merchant_order_id`, and `payment_status` for display/navigation only.
 
 ## Confirm a Razorpay checkout
 
@@ -77,3 +80,4 @@ Configure provider webhooks to TechNext Pay's tenant URL in the README. TechNext
 - **HRMS:** tie orders to immutable invoice IDs; do not mark salary, payroll, statutory deductions, or employee claims paid based only on a client redirect.
 - **Astrology apps:** define the purchased service and refund/cancellation rules before charging; grant access only after verified `PAID` status.
 - **Client products:** issue one tenant key and separate provider merchant configuration per client/legal merchant. Confirm direct onboarding or a provider-approved platform arrangement with the provider before accepting client funds.
+
