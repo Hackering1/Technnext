@@ -1,4 +1,5 @@
 import { randomUUID, createHmac } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -19,6 +20,7 @@ import { safeEqual } from './crypto.js';
 const logger = pino({ level: process.env.LOG_LEVEL || 'info', redact: ['req.headers.authorization', 'req.headers.cookie'] });
 const redis = new Redis(config.REDIS_URL, { maxRetriesPerRequest: 2, enableReadyCheck: true });
 const app = express();
+const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 if (config.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(pinoHttp({ logger, genReqId: (req) => req.get('x-request-id') || randomUUID(), redact: ['req.headers.authorization', 'req.headers.cookie'] }));
@@ -136,6 +138,8 @@ app.get('/v1/orders/:id', async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+app.use(express.static(publicDir, { index: 'index.html', maxAge: '5m' }));
+
 app.use((error, req, res, _next) => {
   const status = Number.isInteger(error.status) ? error.status : error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : 500;
   req.log?.error({ err: error, code: error.code, status }, 'request failed');
@@ -155,4 +159,3 @@ async function shutdown(signal) {
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
-
