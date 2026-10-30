@@ -15,7 +15,7 @@ import { authenticateTenant } from './auth.js';
 import { getProviderAccount, fetchRazorpayPayment } from './providers.js';
 import { createOrder, getOrderForTenant, markPaidFromProvider } from './order-service.js';
 import { handleProviderWebhook } from './webhooks.js';
-import { safeEqual } from './crypto.js';
+import { hashApiKey, safeEqual } from './crypto.js';
 import { createCheckoutToken, readCheckoutToken } from './checkout-token.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'info', redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.x-checkout-token'] });
@@ -28,11 +28,33 @@ const checkoutLimiter = rateLimit({
   legacyHeaders: false,
   store: new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix: 'tnp:checkout:' })
 });
+const dashboardLoginLimiter = rateLimit({
+  windowMs: 60_000,
+  limit: 8,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  store: new RedisStore({ sendCommand: (...args) => redis.call(...args), prefix: 'tnp:dashboard-login:' })
+});
 const publicDir = fileURLToPath(new URL('../public/', import.meta.url));
 if (config.trustProxy) app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use(pinoHttp({ logger, genReqId: (req) => req.get('x-request-id') || randomUUID(), redact: ['req.headers.authorization', 'req.headers.cookie', 'req.headers.x-checkout-token'] }));
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'same-site' } }));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'same-site' },
+  contentSecurityPolicy: {
+    directives: {
+      scriptSrc: ["'self'", 'https://checkout.razorpay.com', 'https://sdk.cashfree.com', 'https://*.razorpay.com', 'https://*.cashfree.com'],
+      connectSrc: ["'self'", 'https://*.razorpay.com', 'https://*.cashfree.com'],
+      frameSrc: ["'self'", 'https://*.razorpay.com', 'https://*.cashfree.com'],
+      formAction: ["'self'", 'https://*.razorpay.com', 'https://*.cashfree.com'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"]
+    }
+  }
+}));
 app.use(cors({ origin(origin, callback) {
   if (!origin || config.allowedOrigins.includes(origin)) return callback(null, true);
   return callback(Object.assign(new Error('Origin is not allowed'), { status: 403, code: 'origin_not_allowed' }));
@@ -89,6 +111,131 @@ function requireCheckoutToken(req, res, next) {
   req.checkoutOrderId = orderId;
   return next();
 }
+
+function dashboardSessionSignature(tenantId, apiKeyId, expiresAt) {
+  return createHmac('sha256', config.API_KEY_PEPPER)
+    .update(`technext-dashboard:${tenantId}:${apiKeyId}:${expiresAt}`)
+    .digest('base64url');
+}
+
+function requireDashboardSession(req, res, next) {
+  const cookie = (req.get('cookie') || '').split(';').map((part) => part.trim()).find((part) => part.startsWith('tnp_session='));
+  const token = cookie?.slice('tnp_session='.length);
+  const parts = token?.split('.');
+  if (!parts || parts.length !== 4) return res.status(401).json({ error: 'dashboard_session_required' });
+  const [tenantId, apiKeyId, expiresText, signature] = parts;
+  const expiresAt = Number(expiresText);
+  if (!z.string().uuid().safeParse(tenantId).success || !z.string().uuid().safeParse(apiKeyId).success || !Number.isSafeInteger(expiresAt) || expiresAt < Math.floor(Date.now() / 1000) || !safeEqual(dashboardSessionSignature(tenantId, apiKeyId, expiresAt), signature)) {
+    return res.status(401).json({ error: 'dashboard_session_expired' });
+  }
+  pool.query(
+    `SELECT t.id, t.slug, t.name FROM tenants t JOIN api_keys k ON k.tenant_id = t.id
+     WHERE t.id = $1 AND k.id = $2 AND k.revoked_at IS NULL AND t.active = TRUE`, [tenantId, apiKeyId]
+  ).then((result) => {
+    if (!result.rows[0]) return res.status(401).json({ error: 'dashboard_session_revoked' });
+    req.tenant = result.rows[0];
+    return next();
+  }).catch(next);
+}
+
+app.post('/dashboard/api/session', dashboardLoginLimiter, async (req, res, next) => {
+  try {
+    const parsed = z.object({ apiKey: z.string().regex(/^tnp_live_[a-f0-9-]{36}\.[A-Za-z0-9_-]{40,}$/) }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_api_key' });
+    const apiKey = parsed.data.apiKey;
+    const apiKeyId = apiKey.slice('tnp_live_'.length).split('.')[0];
+    const result = await pool.query(
+      `SELECT t.id AS tenant_id, t.name, k.id AS api_key_id, k.key_hash
+       FROM api_keys k JOIN tenants t ON t.id = k.tenant_id
+       WHERE k.id = $1 AND k.revoked_at IS NULL AND t.active = TRUE`, [apiKeyId]
+    );
+    const row = result.rows[0];
+    if (!row || !safeEqual(hashApiKey(apiKey), row.key_hash, 'hex')) return res.status(401).json({ error: 'invalid_api_key' });
+    const expiresAt = Math.floor(Date.now() / 1000) + 8 * 60 * 60;
+    const signature = dashboardSessionSignature(row.tenant_id, row.api_key_id, expiresAt);
+    const sessionToken = `${row.tenant_id}.${row.api_key_id}.${expiresAt}.${signature}`;
+    const secure = config.NODE_ENV === 'production' ? '; Secure' : '';
+    res.set('Set-Cookie', `tnp_session=${sessionToken}; Path=/; Max-Age=28800; HttpOnly; SameSite=Strict${secure}`);
+    res.set('Cache-Control', 'no-store');
+    return res.json({ merchantName: row.name, expiresAt });
+  } catch (error) { return next(error); }
+});
+
+app.delete('/dashboard/api/session', (_req, res) => {
+  const secure = config.NODE_ENV === 'production' ? '; Secure' : '';
+  res.set('Set-Cookie', `tnp_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict${secure}`);
+  return res.status(204).end();
+});
+
+app.get('/dashboard/api/session', requireDashboardSession, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  return res.json({ merchantName: req.tenant.name });
+});
+
+app.get('/dashboard/api/summary', requireDashboardSession, async (req, res, next) => {
+  try {
+    const [summary, providers, daily] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*)::int AS total_orders,
+                COUNT(*) FILTER (WHERE status = 'PAID')::int AS paid_orders,
+                COUNT(*) FILTER (WHERE status = 'PENDING')::int AS pending_orders,
+                COUNT(*) FILTER (WHERE status IN ('FAILED','EXPIRED','CREATE_FAILED'))::int AS failed_orders,
+                COALESCE(SUM(amount_minor) FILTER (WHERE status = 'PAID'), 0)::bigint AS paid_amount_minor
+         FROM payment_orders WHERE tenant_id = $1 AND created_at >= NOW() - INTERVAL '30 days'`, [req.tenant.id]
+      ),
+      pool.query('SELECT provider, environment FROM provider_accounts WHERE tenant_id = $1 AND active = TRUE ORDER BY provider', [req.tenant.id]),
+      pool.query(
+        `SELECT TO_CHAR(DATE_TRUNC('day', created_at), 'YYYY-MM-DD') AS day,
+                COALESCE(SUM(amount_minor) FILTER (WHERE status = 'PAID'), 0)::bigint AS paid_amount_minor,
+                COUNT(*) FILTER (WHERE status = 'PAID')::int AS paid_orders
+         FROM payment_orders WHERE tenant_id = $1 AND created_at >= CURRENT_DATE - INTERVAL '13 days'
+         GROUP BY DATE_TRUNC('day', created_at) ORDER BY DATE_TRUNC('day', created_at)`, [req.tenant.id]
+      )
+    ]);
+    res.set('Cache-Control', 'no-store');
+    return res.json({ ...summary.rows[0], paid_amount_minor: Number(summary.rows[0].paid_amount_minor), providers: providers.rows, daily: daily.rows.map((row) => ({ ...row, paid_amount_minor: Number(row.paid_amount_minor) })) });
+  } catch (error) { return next(error); }
+});
+
+app.get('/dashboard/api/orders', requireDashboardSession, async (req, res, next) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 100);
+    const result = await pool.query(
+      `SELECT o.id, o.merchant_order_id, o.amount_minor, o.currency, o.status, o.created_at, a.provider,
+              CASE WHEN o.idempotency_key LIKE 'dashboard-%' THEN 'Payment link' ELSE 'API' END AS source
+       FROM payment_orders o JOIN provider_accounts a ON a.id = o.provider_account_id
+       WHERE o.tenant_id = $1 ORDER BY o.created_at DESC LIMIT $2`, [req.tenant.id, limit]
+    );
+    res.set('Cache-Control', 'no-store');
+    return res.json({ orders: result.rows.map((row) => ({ ...row, amount_minor: Number(row.amount_minor) })) });
+  } catch (error) { return next(error); }
+});
+
+app.post('/dashboard/api/payment-links', requireDashboardSession, async (req, res, next) => {
+  try {
+    const parsed = z.object({
+      provider: z.enum(['razorpay', 'cashfree']),
+      merchantOrderId: z.string().min(1).max(100),
+      amountMinor: z.number().int().min(100).max(50_000_000),
+      customer: z.object({ id: z.string().min(1).max(100), phone: z.string().regex(/^\+?[0-9]{8,15}$/), email: z.string().email().optional() })
+    }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'invalid_request', details: parsed.error.issues.map((issue) => ({ field: issue.path.join('.'), message: issue.message })) });
+    const returnUrl = `${config.FRONTEND_BASE_URL.replace(/\/$/, '')}/dashboard.html?payment=return`;
+    const result = await createOrder({
+      tenant: req.tenant,
+      provider: parsed.data.provider,
+      idempotencyKey: `dashboard-${randomUUID()}`,
+      amountMinor: parsed.data.amountMinor,
+      currency: 'INR',
+      customer: { ...parsed.data.customer, orderRef: parsed.data.merchantOrderId },
+      returnUrl,
+      publicBaseUrl: config.PUBLIC_BASE_URL.replace(/\/$/, ''),
+      frontendBaseUrl: config.FRONTEND_BASE_URL
+    });
+    if (result.conflict) return res.status(409).json({ error: 'order_creation_in_progress', orderId: result.order.id });
+    return res.status(201).json({ orderId: result.order.id, status: result.order.status, amountMinor: Number(result.order.amount_minor), currency: result.order.currency, checkoutUrl: `${config.FRONTEND_BASE_URL.replace(/\/$/, '')}/checkout.html#${createCheckoutToken(result.order.id)}` });
+  } catch (error) { return next(error); }
+});
 
 async function confirmRazorpayPayment(orderId, tenantId, paymentFields) {
   const orderResult = await pool.query(
