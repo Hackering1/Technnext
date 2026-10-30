@@ -95,3 +95,4 @@ async function updateApiStatus() {
 showSnippet('cashfree');
 updateApiStatus();
 setInterval(updateApiStatus, 30_000);
+
