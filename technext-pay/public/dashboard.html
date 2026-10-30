@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Merchant dashboard — TechNext Pay</title>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <section id="login-view" class="login-view" hidden>
+    <div class="login-card">
+      <a class="brand" href="/"><span class="brand-mark">T<span>+</span></span><span>technext<span class="brand-pay">pay</span></span></a>
+      <div class="login-kicker">MERCHANT WORKSPACE</div>
+      <h1>Sign in to your<br><span>payments dashboard.</span></h1>
+      <p>Use your TechNext Pay tenant API key to open the matching merchant workspace. The key is exchanged for a short-lived, secure session.</p>
+      <form id="login-form">
+        <label for="api-key">Tenant API key</label>
+        <input id="api-key" name="apiKey" type="password" autocomplete="off" placeholder="tnp_live_…" required>
+        <div id="login-error" class="form-error" role="alert"></div>
+        <button class="button button-primary" type="submit">Open dashboard <span>→</span></button>
+      </form>
+      <div class="login-note"><span>⌑</span><span>Keys are never saved in this browser. Use your sandbox tenant key for testing.</span></div>
+      <a class="back-link" href="/">← Back to TechNext Pay</a>
+    </div>
+  </section>
+  <div id="app-view" class="app-shell" hidden>
+    <aside class="sidebar">
+      <a class="brand side-brand" href="/"><span class="brand-mark">T<span>+</span></span><span>technext<span class="brand-pay">pay</span></span></a>
+      <div class="workspace-label">MERCHANT WORKSPACE</div>
+      <div class="tenant-chip"><span class="tenant-avatar" id="tenant-avatar">T</span><span class="tenant-name" id="tenant-name">Merchant</span><span class="chevron">⌄</span></div>
+      <div class="nav-label">PAYMENTS</div>
+      <nav class="side-nav" aria-label="Merchant navigation">
+        <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
+        <button class="nav-item" data-view="transactions"><span>⇄</span> Transactions</button>
+        <button class="nav-item" data-view="links"><span>↗</span> Payment links</button>
+      </nav>
+      <div class="nav-label tools-label">DEVELOPERS</div>
+      <nav class="side-nav"><button class="nav-item" data-view="developers"><span>⌘</span> API & webhooks</button><button class="nav-item" data-view="settings"><span>⚙</span> Providers</button></nav>
+      <div class="sidebar-bottom"><div class="help-card"><span class="help-icon">?</span><b>Need a hand?</b><small>Read the integration guide</small><a href="https://github.com/Hackering1/Technnext/tree/main/technext-pay/docs" target="_blank" rel="noreferrer">Open docs ↗</a></div><button id="logout-button" class="logout-button"><span>↪</span> Sign out</button></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar"><div class="breadcrumbs"><span>Payments</span><b>/</b><strong id="current-section">Overview</strong></div><div class="topbar-right"><div class="environment"><i></i><span>CONNECTED</span></div><button id="refresh-button" class="icon-button" aria-label="Refresh dashboard">↻</button><div class="profile-avatar" id="profile-avatar">T</div></div></header>
+      <div class="content-wrap">
+        <div class="page-head"><div><div class="date-label">PAYMENTS · LAST 30 DAYS</div><h1 id="page-title">Your payment overview</h1><p id="page-subtitle">A live view of your merchant account activity.</p></div><button class="button button-primary create-link-open" type="button"><span>＋</span> Create payment link</button></div>
+        <div class="sandbox-banner"><span class="sandbox-icon">⌁</span><div><b id="environment-title">Checking provider environment</b><span id="environment-detail">Provider-backed payments require an active merchant account.</span></div><a href="#" data-view-link="settings">View provider setup →</a></div>
+        <section class="view-section active" id="view-overview" aria-label="Payment overview">
+          <div class="metric-grid">
+            <article class="metric-card"><div class="metric-title">Paid volume <span>ⓘ</span></div><div class="metric-value" id="metric-volume">₹0.00</div><div class="metric-foot"><i class="metric-dot green"></i><span>Verified payments · last 30 days</span></div></article>
+            <article class="metric-card"><div class="metric-title">Successful payments</div><div class="metric-value" id="metric-paid">0</div><div class="metric-foot"><i class="metric-dot green"></i><span>Confirmed by provider</span></div></article>
+            <article class="metric-card"><div class="metric-title">Pending payments</div><div class="metric-value" id="metric-pending">0</div><div class="metric-foot"><i class="metric-dot amber"></i><span>Awaiting final status</span></div></article>
+            <article class="metric-card"><div class="metric-title">Failed payments</div><div class="metric-value" id="metric-failed">0</div><div class="metric-foot"><i class="metric-dot red"></i><span>Failed or expired</span></div></article>
+          </div>
+          <div class="overview-grid">
+            <article class="panel volume-panel"><div class="panel-head"><div><h2>Payment volume</h2><p>Captured payments by day</p></div><span class="panel-period">LAST 14 DAYS <b>⌄</b></span></div><div id="volume-chart" class="volume-chart"></div></article>
+            <article class="panel provider-panel"><div class="panel-head"><div><h2>Provider accounts</h2><p>Connected payment providers</p></div><button class="subtle-link" data-view-link="settings">Manage</button></div><div id="provider-summary" class="provider-summary"></div><div class="provider-foot">Payment methods depend on provider activation.</div></article>
+          </div>
+          <article class="panel transactions-panel"><div class="panel-head"><div><h2>Recent transactions</h2><p>Latest payment activity from this account</p></div><button class="subtle-link" data-view-link="transactions">View all →</button></div><div id="recent-orders"></div></article>
+        </section>
+        <section class="view-section" id="view-transactions" aria-label="Transactions"><article class="panel full-panel"><div class="panel-head"><div><h2>Transactions</h2><p>Verified order activity from your provider account</p></div><select id="transaction-filter" class="filter-select" aria-label="Filter transactions"><option value="all">All statuses</option><option value="PAID">Paid</option><option value="PENDING">Pending</option><option value="FAILED">Failed</option></select></div><div id="all-orders"></div></article></section>
+        <section class="view-section" id="view-links" aria-label="Payment links"><div class="links-callout"><div><div class="eyebrow">NO-CODE COLLECTIONS</div><h2>Share a secure link.<br><span>Get paid when they do.</span></h2><p>Create a one-time payment link for an invoice, consultation, course, or service. The amount is locked to the order.</p></div><button class="button button-primary create-link-open" type="button">＋ Create payment link</button></div><article class="panel full-panel"><div class="panel-head"><div><h2>Your payment links</h2><p>Links created from this dashboard</p></div></div><div id="link-orders"></div></article></section>
+        <section class="view-section" id="view-developers" aria-label="API and webhooks"><div class="dev-cards"><article class="panel developer-card"><div class="dev-symbol">⌘</div><div class="eyebrow">ORDERS API</div><h2>Connect your product backend</h2><p>Create an order on your server, then send the customer to its checkoutUrl. Keep the tenant API key in server secrets.</p><a class="button button-outline-dark" href="https://github.com/Hackering1/Technnext/tree/main/technext-pay/docs" target="_blank" rel="noreferrer">Read API guide ↗</a></article><article class="panel developer-card"><div class="dev-symbol violet">⇄</div><div class="eyebrow">SIGNED WEBHOOKS</div><h2>Know when payment status changes</h2><p>Verify the signature and fulfil your invoice only after TechNext Pay reports a provider-confirmed payment.</p><a class="button button-outline-dark" href="https://github.com/Hackering1/Technnext/blob/main/technext-pay/docs/INTEGRATION.md" target="_blank" rel="noreferrer">Webhook setup ↗</a></article></div><article class="panel code-panel"><div class="panel-head"><div><h2>Create a payment order</h2><p>Example request from your product backend</p></div><span class="server-only">SERVER ONLY</span></div><pre><code id="api-example"></code></pre></article></section>
+        <section class="view-section" id="view-settings" aria-label="Provider accounts"><article class="panel full-panel"><div class="panel-head"><div><h2>Provider setup</h2><p>Each merchant uses its own approved provider account</p></div><span class="server-only">CREDENTIALS ENCRYPTED AT REST</span></div><div id="provider-settings" class="provider-settings"></div><div class="settings-note"><b>To enable a provider</b><span>Provider activation and keys are managed by the TechNext Pay operator. Never share live secrets in the browser or in chat. Each legal merchant needs its own approved account.</span></div></article></section>
+      </div>
+    </main>
+  </div>
+  <dialog id="link-dialog" class="link-dialog"><form id="link-form" method="dialog"><div class="dialog-head"><div><div class="eyebrow">PAYMENT LINKS</div><h2>Create a payment link</h2></div><button id="close-dialog" class="icon-button" type="button" aria-label="Close">×</button></div><label>What is this payment for?<input name="merchantOrderId" type="text" maxlength="100" placeholder="e.g. HRMS invoice 2026-104" required></label><div class="form-row"><label>Amount (₹)<input name="amount" type="number" min="1" max="500000" step="0.01" placeholder="1,299.00" required></label><label>Provider<select name="provider" id="link-provider" required></select></label></div><label>Customer phone<input name="phone" type="tel" inputmode="tel" pattern="\+?[0-9]{8,15}" placeholder="+919876543210" required></label><div id="link-error" class="form-error" role="alert"></div><button class="button button-primary dialog-submit" type="submit">Create secure payment link <span>→</span></button><p class="dialog-disclaimer">A provider will process the payment and apply its standard fees.</p></form><div id="link-result" class="link-result" hidden><div class="result-check">✓</div><h2>Payment link ready</h2><p>Send this one-time link to your customer. It expires in 24 hours.</p><div class="link-copy-row"><input id="created-link" type="text" readonly><button id="copy-created-link" type="button">Copy</button></div><button id="done-link" class="button button-primary dialog-submit" type="button">Done</button></div></dialog>
+</body>
+</html>
+
