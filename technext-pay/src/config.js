@@ -8,6 +8,7 @@ const schema = z.object({
   DB_SSL_MODE: z.enum(['verify', 'require', 'disable']).default('verify'),
   REDIS_URL: z.string().url(),
   PUBLIC_BASE_URL: z.string().url(),
+  FRONTEND_BASE_URL: z.string().url().default('https://technext-pay-frontend.onrender.com'),
   API_KEY_PEPPER: z.string().min(32),
   DATA_ENCRYPTION_KEY: z.string().min(40),
   ALLOWED_ORIGINS: z.string().default(''),
@@ -29,3 +30,4 @@ const publicBase = new URL(config.PUBLIC_BASE_URL);
 if (publicBase.username || publicBase.password || (config.NODE_ENV === 'production' && publicBase.protocol !== 'https:')) {
   throw new Error('PUBLIC_BASE_URL must be HTTPS in production and must not contain credentials');
 }
+
