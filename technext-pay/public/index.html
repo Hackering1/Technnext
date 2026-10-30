@@ -3,38 +3,83 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f7fb">
-  <title>TechNext Pay — UPI checkout starter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="TechNext Pay payment infrastructure for HRMS, astrology, and client products. Integrate Razorpay or Cashfree through one secure API.">
+  <title>TechNext Pay — Payment infrastructure for your products</title>
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="#"><span class="brand-mark">T</span><span>technext<span class="brand-pay">pay</span></span></a><span class="env-pill"><i></i> SANDBOX DEMO</span></header>
-  <main class="layout">
-    <section class="intro">
-      <div class="eyebrow"><span></span> A simpler way to collect UPI</div>
-      <h1>Payments that<br>move your business <em>forward.</em></h1>
-      <p class="lead">A clean, developer-friendly checkout starter for Indian businesses. Create a payment request, show a UPI QR, and build the provider integration that fits your needs.</p>
-      <div class="feature-row"><span><b>↗</b> Developer first</span><span><b>◎</b> UPI ready</span><span><b>⌘</b> Your infrastructure</span></div>
-      <div class="note"><span class="note-icon">i</span><div><strong>Sandbox preview</strong><br>This starter creates a UPI payment request. It does not verify whether money reached your bank.</div></div>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="TechNext Pay home"><span class="brand-mark">T<span>+</span></span><span>technext<span class="brand-pay">pay</span></span></a>
+    <nav class="nav-links" aria-label="Main navigation"><a href="#platform">Platform</a><a href="#flow">How it works</a><a href="#developers">Developers</a></nav>
+    <div class="top-actions"><span id="api-status" class="status-pill"><i></i><span>Checking API</span></span><a class="button button-small button-outline" href="https://github.com/Hackering1/Technnext/tree/main/technext-pay" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
+  </header>
+
+  <main id="top">
+    <section class="hero shell">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-line"></span>PAYMENTS BUILT FOR TECHNEXT PRODUCTS</div>
+        <h1>One payment layer.<br><span>Every product.</span></h1>
+        <p class="hero-lead">Connect your HRMS, astrology apps, and client products to approved payment providers through one secure integration API.</p>
+        <div class="hero-actions"><a class="button button-primary" href="#developers">Explore the integration <span aria-hidden="true">→</span></a><a class="text-link" href="#flow">See how it works <span aria-hidden="true">↓</span></a></div>
+        <div class="provider-line"><span>PROVIDER CHECKOUTS</span><b>Razorpay</b><b>Cashfree</b><i></i><span>YOUR MERCHANT ACCOUNT</span></div>
+      </div>
+      <div class="hero-visual" aria-label="TechNext Pay order and provider checkout flow">
+        <div class="glow"></div>
+        <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+        <div class="pay-card">
+          <div class="pay-card-top"><span class="mini-brand"><span class="mini-mark">T</span> TECHNEXT PAY</span><span class="sandbox-tag">SANDBOX</span></div>
+          <div class="order-label">PAYMENT ORDER</div><div class="order-amount">₹ 1,299<span>.00</span></div>
+          <div class="order-meta"><span>Order status</span><b><i></i> Pending</b></div>
+          <div class="card-divider"></div>
+          <div class="checkout-label">Continue with a provider</div>
+          <div class="provider-option"><span class="provider-symbol razor">R</span><span><b>Razorpay Checkout</b><small>UPI · Cards · Netbanking</small></span><span class="provider-arrow">↗</span></div>
+          <div class="provider-option"><span class="provider-symbol cash">C</span><span><b>Cashfree Checkout</b><small>UPI · Cards · Netbanking</small></span><span class="provider-arrow">↗</span></div>
+          <div class="secure-note"><span>⌑</span> Verified provider checkout · hosted by your payment provider</div>
+        </div>
+        <div class="float-chip chip-top"><span class="chip-icon green">✓</span><span><b>Signed events</b><small>Delivered to your backend</small></span></div>
+        <div class="float-chip chip-bottom"><span class="chip-icon blue">↻</span><span><b>Order reconciliation</b><small>Payment status stays in sync</small></span></div>
+      </div>
+      <div class="hero-footnote"><span class="pulse"></span><span>TEST ENVIRONMENT</span><span class="footnote-sep">•</span><span>No provider merchant credentials are configured yet</span></div>
     </section>
-    <section class="checkout-card" aria-labelledby="checkout-title">
-      <div class="card-heading"><div><div class="card-kicker">TECHNEXT PAY</div><h2 id="checkout-title">Try the checkout</h2></div><div class="secure-icon">⌑</div></div>
-      <p class="card-subtitle">Create a demo payment request in seconds.</p>
-      <form id="pay-form">
-        <label for="amount">Payment amount</label>
-        <div class="amount-input"><span>₹</span><input id="amount" name="amount" type="number" min="1" max="100000" step="0.01" value="499" required><span class="currency">INR</span></div>
-        <div class="quick-amounts"><button type="button" data-amount="199">₹199</button><button type="button" data-amount="499">₹499</button><button type="button" data-amount="999">₹999</button></div>
-        <button class="pay-button" type="submit"><span>Create UPI request</span><span>→</span></button>
-      </form>
-      <div id="result" class="result" hidden></div>
-      <div class="powered">A starter project by <strong>TechNext</strong><span>•</span> UPI payments are handled by your bank and UPI app</div>
+
+    <section id="platform" class="platform-section">
+      <div class="shell">
+        <div class="section-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span>THE PLATFORM</div><h2>Payment operations,<br><span>without the glue code.</span></h2></div><p>Keep payment logic in one place while each product uses its own provider account and verified checkout flow.</p></div>
+        <div class="feature-grid">
+          <article class="feature-card"><div class="feature-icon icon-lime">↗</div><div class="feature-index">01 / CHECKOUT</div><h3>Provider-hosted payments</h3><p>Create orders server-side and launch the official Razorpay or Cashfree checkout. Card data stays with the provider.</p><div class="feature-foot">Razorpay + Cashfree</div></article>
+          <article class="feature-card"><div class="feature-icon icon-violet">⌁</div><div class="feature-index">02 / STATUS</div><h3>Verified payment state</h3><p>Validate provider signatures, match amounts and currencies, deduplicate webhook events, and reconcile pending orders.</p><div class="feature-foot">Signed webhooks · Idempotency</div></article>
+          <article class="feature-card"><div class="feature-icon icon-cyan">▦</div><div class="feature-index">03 / PRODUCTS</div><h3>One tenant per product</h3><p>Give HRMS, astrology apps, and client products separate keys and merchant configurations.</p><div class="feature-foot">Tenant-scoped access</div></article>
+        </div>
+        <div class="notice"><span class="notice-icon">i</span><p><b>TechNext Pay routes payment operations; it does not hold or settle funds.</b> Each legal merchant needs its own provider-approved merchant account. Provider fees still apply.</p><a href="https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12896" target="_blank" rel="noreferrer">Operating boundary ↗</a></div>
+      </div>
     </section>
+
+    <section id="flow" class="flow-section shell">
+      <div class="section-heading compact"><div><div class="eyebrow"><span class="eyebrow-line"></span>HOW IT WORKS</div><h2>From order to <span>confirmed.</span></h2></div><p>Keep fulfilment in your product backend. A browser redirect alone never confirms a payment.</p></div>
+      <div class="flow-grid">
+        <article class="flow-step"><span class="step-num">01</span><div class="flow-visual flow-code"><span class="code-dot"></span><span class="code-dot"></span><span class="code-dot"></span><div><i>POST</i> /v1/orders</div><div class="code-line">amountMinor: 129900</div><div class="code-line">idempotencyKey: …</div></div><h3>Your backend creates the order</h3><p>Calculate the amount from trusted invoice data and call TechNext Pay with your tenant key.</p></article>
+        <article class="flow-step"><span class="step-num">02</span><div class="flow-visual flow-provider"><div class="provider-bubble bubble-r">R</div><div class="flow-dash"></div><div class="provider-bubble bubble-c">C</div><span>HOSTED CHECKOUT</span></div><h3>Customer pays with the provider</h3><p>Launch the official provider checkout with its returned order or payment-session details.</p></article>
+        <article class="flow-step"><span class="step-num">03</span><div class="flow-visual flow-webhook"><span class="webhook-node">TNP</span><span class="webhook-dash"></span><span class="webhook-node node-app">APP</span><b>HMAC ✓</b></div><h3>Your backend receives a signed event</h3><p>Verify the signature, match the order to your invoice, and fulfil idempotently after confirmation.</p></article>
+      </div>
+    </section>
+
+    <section id="developers" class="developer-section">
+      <div class="shell dev-layout">
+        <div class="dev-copy"><div class="eyebrow"><span class="eyebrow-line"></span>FOR DEVELOPERS</div><h2>Start with one<br><span>server-side call.</span></h2><p>Your app backend owns pricing and fulfilment. TechNext Pay keeps provider secrets server-side and returns only the checkout fields your UI needs.</p><div class="dev-points"><span><i>✓</i> Stable idempotency keys</span><span><i>✓</i> Integer paise amounts</span><span><i>✓</i> Per-tenant API keys</span></div><a class="text-link" href="https://github.com/Hackering1/Technnext/tree/main/technext-pay/docs" target="_blank" rel="noreferrer">Read the integration guide <span aria-hidden="true">↗</span></a></div>
+        <div class="code-panel">
+          <div class="code-panel-head"><div class="code-tabs"><button class="code-tab active" data-provider="cashfree">Cashfree</button><button class="code-tab" data-provider="razorpay">Razorpay</button></div><button id="copy-code" class="copy-button" type="button">Copy code</button></div>
+          <div class="code-window"><div class="code-file"><span class="file-icon">JS</span> create-payment.js <span class="server-badge">SERVER ONLY</span></div><pre><code id="code-snippet"></code></pre></div>
+          <div class="code-panel-foot"><span class="code-check">✓</span> Provider credentials and tenant keys stay in your backend.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="products-section shell"><div class="section-heading compact"><div><div class="eyebrow"><span class="eyebrow-line"></span>MADE FOR YOUR ECOSYSTEM</div><h2>One foundation.<br><span>Different experiences.</span></h2></div></div><div class="product-row"><article><span class="product-glyph glyph-hr">HR</span><div><b>TechNext HRMS</b><p>Invoice and subscription payments</p></div><span class="product-arrow">↗</span></article><article><span class="product-glyph glyph-astro">✦</span><div><b>Astrology apps</b><p>Reports, consultations, and credits</p></div><span class="product-arrow">↗</span></article><article><span class="product-glyph glyph-client">＋</span><div><b>Client products</b><p>Isolated merchant integrations</p></div><span class="product-arrow">↗</span></article></div></section>
   </main>
-  <footer><span>© <span id="year"></span> TechNext Pay</span><span>Built for clarity. Designed for developers.</span></footer>
+
+  <footer class="footer"><a class="brand footer-brand" href="#top"><span class="brand-mark">T<span>+</span></span><span>technext<span class="brand-pay">pay</span></span></a><span>Payment infrastructure by TechNext</span><div><a href="https://github.com/Hackering1/Technnext/tree/main/technext-pay" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/Hackering1/Technnext/tree/main/technext-pay/docs" target="_blank" rel="noreferrer">Documentation</a></div><small>Sandbox deployment · Provider fees apply · Not for live payments</small></footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="/app.js" defer></script>
 </body>
 </html>
-
