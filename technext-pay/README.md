@@ -36,6 +36,10 @@ npm start
 
 The provider service listens on `PORT` (default `3000`). If TLS terminates at a trusted reverse proxy, set `TRUST_PROXY=true` so production HTTPS enforcement can read the forwarded scheme. For the earlier QR-only sandbox page, run `npm run start:demo`; that demo is intentionally separate from the production API and never confirms payment.
 
+## Free sandbox hosting
+
+The repository root contains a Render Blueprint for a free test deployment. It starts the API and outbox worker together and applies migrations on startup. See [Render test deployment instructions](docs/RENDER-TEST.md). Render's free Postgres expires after 30 days, and the web service sleeps when idle; this setup is for sandbox testing only, not live payments.
+
 Create strong unique values for `API_KEY_PEPPER` and `DATA_ENCRYPTION_KEY` before provisioning tenants. `DATA_ENCRYPTION_KEY` must be a base64-encoded 32-byte key. Store all production secrets in a managed secret store; do not put them in GitHub, source control, client apps, or chat.
 
 ## Provision one merchant tenant
