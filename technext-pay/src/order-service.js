@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { pool } from './db.js';
 import { getProviderAccount, createProviderOrder, fetchProviderOrderStatus } from './providers.js';
+import { createCheckoutToken } from './checkout-token.js';
 
 async function enqueueClientEvent(client, order, status) {
   const eventType = `payment.${status.toLowerCase()}`;
@@ -25,18 +26,18 @@ async function enqueueClientEvent(client, order, status) {
   );
 }
 
-export async function createOrder({ tenant, provider, idempotencyKey, amountMinor, currency, customer, returnUrl, publicBaseUrl }) {
+export async function createOrder({ tenant, provider, idempotencyKey, amountMinor, currency, customer, returnUrl, publicBaseUrl, frontendBaseUrl }) {
   const account = await getProviderAccount(tenant.id, provider);
   const id = randomUUID();
   let order;
   try {
     const result = await pool.query(
       `INSERT INTO payment_orders
-        (id, tenant_id, provider_account_id, idempotency_key, merchant_order_id, amount_minor, currency, status, return_url_hash)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'CREATING',$8)
+        (id, tenant_id, provider_account_id, idempotency_key, merchant_order_id, amount_minor, currency, status, return_url_hash, return_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,'CREATING',$8,$9)
        ON CONFLICT (tenant_id, idempotency_key) DO NOTHING
        RETURNING *`,
-      [id, tenant.id, account.id, idempotencyKey, customer.orderRef, amountMinor, currency, createHash('sha256').update(returnUrl).digest('hex')]
+      [id, tenant.id, account.id, idempotencyKey, customer.orderRef, amountMinor, currency, createHash('sha256').update(returnUrl).digest('hex'), returnUrl]
     );
     order = result.rows[0];
     if (!order) {
@@ -57,7 +58,9 @@ export async function createOrder({ tenant, provider, idempotencyKey, amountMino
   } catch (error) { throw error; }
 
   try {
-    const result = await createProviderOrder(account, order, returnUrl, tenant.slug, publicBaseUrl, customer);
+    const checkoutToken = createCheckoutToken(order.id);
+    const providerReturnUrl = `${frontendBaseUrl.replace(/\/$/, '')}/checkout.html?return=1#${checkoutToken}`;
+    const result = await createProviderOrder(account, order, providerReturnUrl, tenant.slug, publicBaseUrl, customer);
     const saved = await pool.query(
       `UPDATE payment_orders SET provider_order_id = $2, checkout_data = $3, status = 'PENDING', updated_at = NOW()
        WHERE id = $1 RETURNING *`, [order.id, result.providerOrderId, JSON.stringify(result.checkout)]
@@ -142,3 +145,4 @@ export async function markPaidFromProvider({ orderId, provider, providerAccountI
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 }
+
