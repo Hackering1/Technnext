@@ -5,6 +5,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   DATABASE_URL: z.string().url(),
+  DB_SSL_MODE: z.enum(['verify', 'require', 'disable']).default('verify'),
   REDIS_URL: z.string().url(),
   PUBLIC_BASE_URL: z.string().url(),
   API_KEY_PEPPER: z.string().min(32),
@@ -28,4 +29,3 @@ const publicBase = new URL(config.PUBLIC_BASE_URL);
 if (publicBase.username || publicBase.password || (config.NODE_ENV === 'production' && publicBase.protocol !== 'https:')) {
   throw new Error('PUBLIC_BASE_URL must be HTTPS in production and must not contain credentials');
 }
-
