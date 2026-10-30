@@ -11,11 +11,10 @@ services:
         value: production
       - key: TRUST_PROXY
         value: "true"
+      - key: DB_SSL_MODE
+        value: disable
       - key: PUBLIC_BASE_URL
-        fromService:
-          name: technext-pay-test
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
+        value: https://technext-pay-test.onrender.com
       - key: API_KEY_PEPPER
         generateValue: true
       - key: DATA_ENCRYPTION_KEY
