@@ -2,6 +2,29 @@ import { createHash, randomUUID } from 'node:crypto';
 import { pool } from './db.js';
 import { getProviderAccount, createProviderOrder, fetchProviderOrderStatus } from './providers.js';
 
+async function enqueueClientEvent(client, order, status) {
+  const eventType = `payment.${status.toLowerCase()}`;
+  if (!order.webhook_url || !order.encrypted_webhook_secret) return;
+  const eventId = randomUUID();
+  const payload = {
+    eventId,
+    type: eventType,
+    createdAt: new Date().toISOString(),
+    data: {
+      orderId: order.id,
+      merchantOrderId: order.merchant_order_id,
+      amountMinor: Number(order.amount_minor),
+      currency: order.currency,
+      status
+    }
+  };
+  await client.query(
+    `INSERT INTO outbox_events (id, tenant_id, payment_order_id, event_type, payload)
+     VALUES ($1,$2,$3,$4,$5) ON CONFLICT (payment_order_id, event_type) DO NOTHING`,
+    [eventId, order.tenant_id, order.id, eventType, JSON.stringify(payload)]
+  );
+}
+
 export async function createOrder({ tenant, provider, idempotencyKey, amountMinor, currency, customer, returnUrl, publicBaseUrl }) {
   const account = await getProviderAccount(tenant.id, provider);
   const id = randomUUID();
@@ -72,7 +95,11 @@ export async function applyOrderState(orderId, nextState, source) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const found = await client.query('SELECT id, status, amount_minor, currency FROM payment_orders WHERE id = $1 FOR UPDATE', [orderId]);
+    const found = await client.query(
+      `SELECT o.id, o.tenant_id, o.merchant_order_id, o.status, o.amount_minor, o.currency,
+              t.webhook_url, t.encrypted_webhook_secret
+       FROM payment_orders o JOIN tenants t ON t.id = o.tenant_id WHERE o.id = $1 FOR UPDATE OF o`, [orderId]
+    );
     const order = found.rows[0];
     if (!order) { await client.query('ROLLBACK'); return false; }
     if (order.status !== 'PAID' && ['PAID', 'FAILED', 'EXPIRED'].includes(nextState)) {
@@ -81,6 +108,7 @@ export async function applyOrderState(orderId, nextState, source) {
         `INSERT INTO payment_events (payment_order_id, event_type, source)
          VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`, [orderId, `payment.${nextState.toLowerCase()}`, source]
       );
+      await enqueueClientEvent(client, order, nextState);
     }
     await client.query('COMMIT');
     return true;
@@ -93,7 +121,10 @@ export async function markPaidFromProvider({ orderId, provider, providerAccountI
   try {
     await client.query('BEGIN');
     const found = await client.query(
-      'SELECT id, status, amount_minor, currency FROM payment_orders WHERE id = $1 AND provider_account_id = $2 FOR UPDATE', [orderId, providerAccountId]
+      `SELECT o.id, o.tenant_id, o.merchant_order_id, o.status, o.amount_minor, o.currency,
+              t.webhook_url, t.encrypted_webhook_secret
+       FROM payment_orders o JOIN tenants t ON t.id = o.tenant_id
+       WHERE o.id = $1 AND o.provider_account_id = $2 FOR UPDATE OF o`, [orderId, providerAccountId]
     );
     const order = found.rows[0];
     if (!order) { await client.query('ROLLBACK'); return false; }
@@ -104,10 +135,10 @@ export async function markPaidFromProvider({ orderId, provider, providerAccountI
     if (order.status !== 'PAID') {
       await client.query(`UPDATE payment_orders SET status = 'PAID', status_source = $2, updated_at = NOW() WHERE id = $1`, [orderId, `${provider}:${source}`]);
       await client.query('INSERT INTO payment_events (payment_order_id, event_type, source) VALUES ($1,$2,$3)', [orderId, 'payment.paid', `${provider}:${source}`]);
+      await enqueueClientEvent(client, order, 'PAID');
     }
     await client.query('COMMIT');
     return true;
   } catch (error) { await client.query('ROLLBACK'); throw error; }
   finally { client.release(); }
 }
-
