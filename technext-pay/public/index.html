@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>TechNext Pay — UPI checkout starter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="#"><span class="brand-mark">T</span><span>technext<span class="brand-pay">pay</span></span></a><span class="env-pill"><i></i> SANDBOX DEMO</span></header>
+  <main class="layout">
+    <section class="intro">
+      <div class="eyebrow"><span></span> A simpler way to collect UPI</div>
+      <h1>Payments that<br>move your business <em>forward.</em></h1>
+      <p class="lead">A clean, developer-friendly checkout starter for Indian businesses. Create a payment request, show a UPI QR, and build the provider integration that fits your needs.</p>
+      <div class="feature-row"><span><b>↗</b> Developer first</span><span><b>◎</b> UPI ready</span><span><b>⌘</b> Your infrastructure</span></div>
+      <div class="note"><span class="note-icon">i</span><div><strong>Sandbox preview</strong><br>This starter creates a UPI payment request. It does not verify whether money reached your bank.</div></div>
+    </section>
+    <section class="checkout-card" aria-labelledby="checkout-title">
+      <div class="card-heading"><div><div class="card-kicker">TECHNEXT PAY</div><h2 id="checkout-title">Try the checkout</h2></div><div class="secure-icon">⌑</div></div>
+      <p class="card-subtitle">Create a demo payment request in seconds.</p>
+      <form id="pay-form">
+        <label for="amount">Payment amount</label>
+        <div class="amount-input"><span>₹</span><input id="amount" name="amount" type="number" min="1" max="100000" step="0.01" value="499" required><span class="currency">INR</span></div>
+        <div class="quick-amounts"><button type="button" data-amount="199">₹199</button><button type="button" data-amount="499">₹499</button><button type="button" data-amount="999">₹999</button></div>
+        <button class="pay-button" type="submit"><span>Create UPI request</span><span>→</span></button>
+      </form>
+      <div id="result" class="result" hidden></div>
+      <div class="powered">A starter project by <strong>TechNext</strong><span>•</span> UPI payments are handled by your bank and UPI app</div>
+    </section>
+  </main>
+  <footer><span>© <span id="year"></span> TechNext Pay</span><span>Built for clarity. Designed for developers.</span></footer>
+  <script src="/app.js" defer></script>
+</body>
+</html>
+
