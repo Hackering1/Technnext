@@ -9,7 +9,8 @@
     "start:demo": "node server.js",
     "dev": "node --watch src/server.js",
     "db:migrate": "node scripts/migrate.js",
-    "tenant:provision": "node scripts/provision-tenant.js"
+    "tenant:provision": "node scripts/provision-tenant.js",
+    "worker:outbox": "node src/outbox-worker.js"
   },
   "engines": { "node": ">=20" },
   "dependencies": {
@@ -27,4 +28,3 @@
     "zod": "^3.25.76"
   }
 }
-
