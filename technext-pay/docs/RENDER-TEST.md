@@ -4,6 +4,8 @@ The repository includes a Render Blueprint at its root (`render.yaml`). Open Ren
 
 The web container applies database migrations and starts the API plus outbox worker. Once the deploy is healthy, use the service URL shown in Render as `PUBLIC_BASE_URL`. Health endpoints are `/health/live` and `/health/ready`.
 
+The Blueprint uses Render's internal Postgres URL and sets `DB_SSL_MODE=disable`, because Render's internal network connection does not require TLS and its optional internal TLS certificate is self-signed. Keep that setting limited to the private Render deployment; the default for other production deployments still verifies database TLS certificates.
+
 ## Limits
 
 This is for sandbox testing only. Render's free web service can sleep after 15 minutes without traffic and may take about a minute to wake. Free Postgres expires after 30 days and has no backups; free Key Value is in-memory and can lose data on restart. Do not use this deployment for live customers or real payment fulfilment. See [Render's free instance limits](https://render.com/docs/free).
