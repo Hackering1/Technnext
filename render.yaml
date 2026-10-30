@@ -6,7 +6,6 @@ services:
     dockerfilePath: ./technext-pay/Dockerfile
     dockerContext: ./technext-pay
     healthCheckPath: /health/ready
-    maxShutdownDelaySeconds: 30
     envVars:
       - key: NODE_ENV
         value: production
