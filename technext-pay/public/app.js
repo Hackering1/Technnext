@@ -1,3 +1,5 @@
+const API_BASE_URL = 'https://technext-pay-test.onrender.com';
+
 const snippets = {
   cashfree: `const response = await fetch(
   \`${'${process.env.TECHNEXT_PAY_URL}'}/v1/orders\`,
@@ -78,7 +80,7 @@ copyButton.addEventListener('click', async () => {
 
 async function updateApiStatus() {
   try {
-    const response = await fetch('/health/ready', { cache: 'no-store' });
+    const response = await fetch(`${API_BASE_URL}/health/ready`, { cache: 'no-store' });
     if (!response.ok) throw new Error('API is not ready');
     status.classList.remove('down');
     status.classList.add('live');
