@@ -1,33 +1,95 @@
-const form = document.querySelector('#pay-form');
-const amountInput = document.querySelector('#amount');
-const result = document.querySelector('#result');
-document.querySelector('#year').textContent = new Date().getFullYear();
+const snippets = {
+  cashfree: `const response = await fetch(
+  \`${'${process.env.TECHNEXT_PAY_URL}'}/v1/orders\`,
+  {
+    method: 'POST',
+    headers: {
+      authorization: \`Bearer ${'${process.env.TECHNEXT_PAY_API_KEY}'}\`,
+      'content-type': 'application/json',
+      'idempotency-key': \`invoice-${'${invoice.id}'}\`
+    },
+    body: JSON.stringify({
+      provider: 'cashfree',
+      merchantOrderId: invoice.id,
+      amountMinor: invoice.totalPaise,
+      currency: 'INR',
+      customer: { id: user.id, phone: user.phone },
+      returnUrl: 'https://app.example.com/payments/return'
+    })
+  }
+);
+const order = await response.json();
+// Launch the official Cashfree SDK with order.checkout.paymentSessionId.`,
+  razorpay: `const response = await fetch(
+  \`${'${process.env.TECHNEXT_PAY_URL}'}/v1/orders\`,
+  {
+    method: 'POST',
+    headers: {
+      authorization: \`Bearer ${'${process.env.TECHNEXT_PAY_API_KEY}'}\`,
+      'content-type': 'application/json',
+      'idempotency-key': \`invoice-${'${invoice.id}'}\`
+    },
+    body: JSON.stringify({
+      provider: 'razorpay',
+      merchantOrderId: invoice.id,
+      amountMinor: invoice.totalPaise,
+      currency: 'INR',
+      customer: { id: user.id, phone: user.phone },
+      returnUrl: 'https://app.example.com/payments/return'
+    })
+  }
+);
+const order = await response.json();
+// Launch official Razorpay Checkout with order.checkout.orderId.`,
+};
 
-document.querySelectorAll('[data-amount]').forEach((button) => {
-  button.addEventListener('click', () => { amountInput.value = button.dataset.amount; });
-});
+const snippet = document.querySelector('#code-snippet');
+const tabs = document.querySelectorAll('.code-tab');
+const copyButton = document.querySelector('#copy-code');
+const toast = document.querySelector('#toast');
+const status = document.querySelector('#api-status');
+let toastTimer;
 
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const submit = form.querySelector('button[type="submit"]');
-  submit.disabled = true;
-  submit.querySelector('span:first-child').textContent = 'Creating request…';
-  result.hidden = true;
+function showSnippet(provider) {
+  snippet.textContent = snippets[provider];
+  tabs.forEach((tab) => {
+    const active = tab.dataset.provider === provider;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function notify(message) {
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+tabs.forEach((tab) => tab.addEventListener('click', () => showSnippet(tab.dataset.provider)));
+copyButton.addEventListener('click', async () => {
   try {
-    const response = await fetch('/api/orders', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ amount: amountInput.value })
-    });
-    const order = await response.json();
-    if (!response.ok) throw new Error(order.error || 'Could not create request.');
-    result.innerHTML = `<span class="status">PAYMENT NOT VERIFIED</span><h3>UPI request created</h3><p>Scan using a UPI app. This demo cannot confirm settlement.</p><img src="${order.qr}" alt="UPI payment QR code"><div class="order-id">${order.id} · ₹${Number(order.amount).toFixed(2)}</div>`;
-    result.hidden = false;
-  } catch (error) {
-    result.textContent = error.message;
-    result.hidden = false;
-  } finally {
-    submit.disabled = false;
-    submit.querySelector('span:first-child').textContent = 'Create UPI request';
+    await navigator.clipboard.writeText(snippet.textContent);
+    notify('Integration example copied');
+  } catch {
+    notify('Clipboard unavailable in this browser');
   }
 });
 
+async function updateApiStatus() {
+  try {
+    const response = await fetch('/health/ready', { cache: 'no-store' });
+    if (!response.ok) throw new Error('API is not ready');
+    status.classList.remove('down');
+    status.classList.add('live');
+    status.lastElementChild.textContent = 'API operational';
+  } catch {
+    status.classList.remove('live');
+    status.classList.add('down');
+    status.lastElementChild.textContent = 'API waking or unavailable';
+  }
+}
+
+showSnippet('cashfree');
+updateApiStatus();
+setInterval(updateApiStatus, 30_000);
