@@ -4,6 +4,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev && npm cache clean --force
 COPY src ./src
+COPY public ./public
 COPY db ./db
 COPY scripts ./scripts
 USER node
