@@ -16,7 +16,7 @@ services:
       - key: PUBLIC_BASE_URL
         value: https://technext-pay-test.onrender.com
       - key: FRONTEND_BASE_URL
-        value: https://technext-pay-frontend.onrender.com
+        value: https://technext-pay-test.onrender.com
       - key: ALLOWED_ORIGINS
         value: https://technext-pay-frontend.onrender.com
       - key: API_KEY_PEPPER
