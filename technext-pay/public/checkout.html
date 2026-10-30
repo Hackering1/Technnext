@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101627">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Secure checkout — TechNext Pay</title>
+  <link rel="stylesheet" href="/checkout.css">
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+  <script src="/checkout.js" defer></script>
+</head>
+<body>
+  <main class="checkout-shell">
+    <header class="checkout-top"><a class="brand" href="/"><span class="brand-mark">T<span>+</span></span><span>technext<span class="brand-pay">pay</span></span></a><span class="secure"><span>♧</span> SECURE CHECKOUT</span></header>
+    <section class="checkout-card" aria-labelledby="checkout-title">
+      <div class="merchant-mark" aria-hidden="true">T+</div>
+      <p class="eyebrow">PAYMENT REQUEST</p>
+      <h1 id="checkout-title">Complete your payment</h1>
+      <p id="merchant-name" class="merchant-name">Loading merchant…</p>
+      <div class="amount-box"><span>Amount to pay</span><strong id="amount">—</strong><small id="order-reference"></small></div>
+      <div id="notice" class="notice" role="status" aria-live="polite">Preparing your secure checkout…</div>
+      <button id="pay-button" class="pay-button" type="button" disabled>Continue to payment</button>
+      <button id="check-button" class="check-button" type="button" hidden>Check payment status</button>
+      <a id="return-link" class="return-link" href="#" hidden>Return to merchant</a>
+      <p class="methods">UPI · Cards · Netbanking · Wallets</p>
+      <div class="trust"><span aria-hidden="true">✓</span><span>Your payment details are entered only on the selected payment provider’s secure checkout.</span></div>
+    </section>
+    <footer>Payment processing by the merchant’s approved provider. Provider charges and payment availability apply.</footer>
+  </main>
+</body>
+</html>
+
