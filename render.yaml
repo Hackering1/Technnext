@@ -15,6 +15,8 @@ services:
         value: disable
       - key: PUBLIC_BASE_URL
         value: https://technext-pay-test.onrender.com
+      - key: ALLOWED_ORIGINS
+        value: https://technext-pay-frontend.onrender.com
       - key: API_KEY_PEPPER
         generateValue: true
       - key: DATA_ENCRYPTION_KEY
@@ -28,6 +30,14 @@ services:
           name: technext-pay-test-redis
           type: keyvalue
           property: connectionString
+
+  - type: web
+    name: technext-pay-frontend
+    runtime: static
+    rootDir: ./technext-pay
+    plan: free
+    buildCommand: echo "Publishing TechNext Pay frontend"
+    staticPublishPath: public
 
   - type: keyvalue
     name: technext-pay-test-redis
