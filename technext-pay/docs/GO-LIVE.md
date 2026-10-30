@@ -15,7 +15,7 @@ This checklist is not a compliance certification. The current code is a sandbox-
 - Replace the environment-based encryption key with a managed KMS envelope-encryption flow before storing live provider credentials. Document key rotation, access policy, and break-glass procedures.
 - Run dependency, source, threat-model, and penetration reviews. Restrict production secrets to the payment service; use least-privilege database roles and separate sandbox/live environments.
 - Confirm data minimisation, retention/deletion, privacy notices, processor contracts, and applicable Indian data/storage requirements.
-- Add durable event delivery to each product, refunds, dispute/chargeback handling, settlement reconciliation, customer support workflows, and an audit trail before live fulfilment.
+- Configure the outbox worker and each product's HTTPS event endpoint; alert on dead-lettered deliveries. Add refunds, dispute/chargeback handling, settlement reconciliation, customer support workflows, and an audit trail before live fulfilment.
 
 ## Sandbox acceptance
 
@@ -24,4 +24,3 @@ This checklist is not a compliance certification. The current code is a sandbox-
 - Verify order creation retries cannot create multiple charges; reconcile `CREATE_UNKNOWN` manually against the provider before retrying.
 - Test key revocation/rotation and tenant isolation across HRMS, astrology, and client tenants.
 - Record provider sandbox approval, reviewer, deployment revision, and rollback plan before enabling production credentials.
-
