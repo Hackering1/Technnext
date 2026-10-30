@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
+    "start:all": "node src/start-all.js",
     "start:demo": "node server.js",
     "dev": "node --watch src/server.js",
     "db:migrate": "node scripts/migrate.js",
