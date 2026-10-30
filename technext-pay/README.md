@@ -40,6 +40,10 @@ The provider service listens on `PORT` (default `3000`). If TLS terminates at a 
 
 The repository root contains a Render Blueprint for a free test deployment. It starts the API and outbox worker together and applies migrations on startup. See [Render test deployment instructions](docs/RENDER-TEST.md). Render's free Postgres expires after 30 days, and the web service sleeps when idle; this setup is for sandbox testing only, not live payments.
 
+## Web frontend
+
+The API host also serves the TechNext Pay website at `/`: a responsive product overview, provider flow, developer examples with Razorpay/Cashfree tabs, copyable server-side snippets, and a live API health indicator. This is the public product/integration frontend. It does not present fabricated transactions or act as a merchant admin console; tenant provisioning remains an operator action until an authenticated admin API is built.
+
 Create strong unique values for `API_KEY_PEPPER` and `DATA_ENCRYPTION_KEY` before provisioning tenants. `DATA_ENCRYPTION_KEY` must be a base64-encoded 32-byte key. Store all production secrets in a managed secret store; do not put them in GitHub, source control, client apps, or chat.
 
 ## Provision one merchant tenant
