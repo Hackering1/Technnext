@@ -7,6 +7,9 @@ spring:
   jpa:
     hibernate.ddl-auto: validate
     open-in-view: false
+    properties:
+      hibernate:
+        default_schema: ${PAYMENT_SCHEMA:public}
   flyway.enabled: true
   data.redis.url: ${REDIS_URL:redis://localhost:6379}
   kafka.bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
