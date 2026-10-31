@@ -25,7 +25,7 @@ services:
           property: password
       - key: SPRING_FLYWAY_SCHEMAS
         value: technext_pay_platform
-      - key: SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA
+      - key: PAYMENT_SCHEMA
         value: technext_pay_platform
       - key: REDIS_URL
         fromService:
