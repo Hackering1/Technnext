@@ -67,6 +67,10 @@ services:
     ports: ["8080:8080"]
   merchant-portal:
     build: ./frontend/merchant-portal
+    environment:
+      PORT: 80
+      API_SCHEME: http
+      API_HOST: api:8080
     depends_on: [api]
     ports: ["8088:80"]
 
