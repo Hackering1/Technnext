@@ -1,108 +1,50 @@
 # TechNext Pay
 
-TechNext Pay is a multi-tenant **payment integration service** for TechNext products. It creates orders with a tenant's own approved Razorpay or Cashfree merchant account, returns provider checkout data, validates signed provider webhooks, and stores payment state in PostgreSQL.
+**Intelligent Payments. Powered by TechNext AI.**
 
-It does not collect or settle money itself. Configure a separate provider merchant account for each legal merchant/tenant. Do not route client businesses through a single TechNext merchant account unless the provider has approved the exact partner/marketplace arrangement and the required regulatory setup is in place.
+TechNext Pay is an India-first payment technology platform foundation. The new platform milestone provides merchant signup/login, isolated merchant workspaces, one-time sandbox API credentials, idempotent INR order creation, a controlled sandbox payment state machine, and an initial React merchant portal. The sandbox cannot move real funds.
 
-## Current implementation
+## Regulatory boundary
 
-- Server-side order creation for Razorpay and Cashfree.
-- Tenant-scoped API keys; provider credentials encrypted at rest in PostgreSQL.
-- Amounts accepted in integer minor units (paise) and orders protected by idempotency keys.
-- Razorpay and Cashfree webhook signature verification using the original raw request body.
-- Webhook deduplication, amount/currency matching, and monotonic paid status updates.
-- Provider-side status reconciliation for pending orders.
-- Transactional outbox for signed product webhooks, with retries and dead-letter state.
-- PostgreSQL persistence, Redis-backed request rate limiting, health checks, and graceful shutdown.
-- Return URLs restricted to each tenant's configured HTTPS host list.
+This repository does not represent TechNext as an RBI-authorized Payment Aggregator and does not pool or settle customer funds. A technology gateway can route payment instructions without handling funds; payment aggregation and settlement require the applicable authorization and licensed relationships. Real payment methods must use documented, approved bank/acquirer/provider integrations. No fake UPI/card rails are implemented. Each production merchant needs an approved provider arrangement. Obtain qualified Indian regulatory, security, finance and tax review before offering regulated services.
 
-This is a **production foundation, not a production-certified payment system**. It has not been security reviewed or tested against your provider sandbox yet. Refunds, subscriptions/mandates, chargebacks, settlement reconciliation, merchant administration, audit exports, and operational dashboards are not implemented. Keep payment fulfilment disabled until the full lifecycle is tested and reviewed.
+## Local development
 
-## Regulatory and merchant boundary
+Requirements: Docker Compose v2. The compose stack starts PostgreSQL, Redis, single-node Kafka, the Spring Boot API, and the React merchant portal.
 
-RBI's 2025 directions define a Payment Gateway as technology infrastructure that routes/processes payments without handling funds; Payment Aggregators aggregate customer payments and subsequently settle collected funds to merchants. TechNext Pay is designed only for the former model. If TechNext onboards merchants, receives/pools funds, or settles client proceeds, stop and obtain qualified Indian regulatory advice and the appropriate RBI/provider approvals before launching. Each product merchant must be contractually onboarded with its own provider account, or through an explicitly approved provider partner flow. [RBI Master Direction on Regulation of Payment Aggregators, 2025](https://www.rbi.org.in/Scripts/BS_ViewMasDirections.aspx?id=12896)
-
-## Local setup
-
-Requires Node.js 20+, PostgreSQL 15+, and Redis 7+.
-
-```sh
-copy .env.example .env
-docker compose up -d
-npm install
-npm run db:migrate
-npm start
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
 ```
 
-The provider service listens on `PORT` (default `3000`). If TLS terminates at a trusted reverse proxy, set `TRUST_PROXY=true` so production HTTPS enforcement can read the forwarded scheme. For the earlier QR-only sandbox page, run `npm run start:demo`; that demo is intentionally separate from the production API and never confirms payment.
+Open the merchant portal at `http://localhost:8088` and API health at `http://localhost:8080/actuator/health`. On signup, a `REGISTERED` merchant receives a test public key and a test secret key shown once. Keep the secret in a private server-side environment variable. Test-mode order creation is available before KYC approval; live access is not.
 
-## Free sandbox hosting
+Run backend tests with Java 17+ and Maven:
 
-The repository root contains a Render Blueprint for a free test deployment. It starts the API and outbox worker together and applies migrations on startup. See [Render test deployment instructions](docs/RENDER-TEST.md). Render's free Postgres expires after 30 days, and the web service sleeps when idle; this setup is for sandbox testing only, not live payments.
-
-## Web frontend
-
-The API host also serves the TechNext Pay website at `/`: a responsive product overview, provider flow, developer examples with Razorpay/Cashfree tabs, copyable server-side snippets, and a live API health indicator. This is the public product/integration frontend. It does not present fabricated transactions or act as a merchant admin console; tenant provisioning remains an operator action until an authenticated admin API is built.
-
-Create strong unique values for `API_KEY_PEPPER` and `DATA_ENCRYPTION_KEY` before provisioning tenants. `DATA_ENCRYPTION_KEY` must be a base64-encoded 32-byte key. Store all production secrets in a managed secret store; do not put them in GitHub, source control, client apps, or chat.
-
-## Provision one merchant tenant
-
-Provide the tenant settings and credentials through your deployment secret manager or a protected operator shell, then run `npm run tenant:provision`. Required values:
-
-- `TENANT_NAME`, `TENANT_SLUG`, `TENANT_PROVIDER` (`razorpay` or `cashfree`), `TENANT_ENVIRONMENT` (`test` or `production`), `TENANT_RETURN_HOSTS` (comma-separated exact hostnames).
-- Razorpay: `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`.
-- Cashfree: `CASHFREE_CLIENT_ID`, `CASHFREE_CLIENT_SECRET`, `CASHFREE_WEBHOOK_SECRET`, `CASHFREE_API_VERSION`.
-- `DATABASE_URL`, `API_KEY_PEPPER`, `DATA_ENCRYPTION_KEY`.
-- Optional `TENANT_WEBHOOK_URL` to receive signed payment status events. Its HTTPS hostname must also appear in `TENANT_RETURN_HOSTS`. Provisioning prints a separate signing secret once; save it in that product backend's secret manager.
-
-The command prints a tenant API key once. Save it in that calling product's backend secret manager. Revoke keys by setting `api_keys.revoked_at`; provision a replacement key before revoking the old one during rotation.
-
-Run a separate worker process alongside the API with `npm run worker:outbox`. It retries non-2xx/network failures with backoff and stops after 20 attempts; monitor dead-lettered rows in `outbox_events` and alert on their presence.
-
-## API
-
-All `/v1` calls use `Authorization: Bearer <tenant-api-key>`.
-
-### Create a provider order
-
-`POST /v1/orders` with `Idempotency-Key: <stable unique value>`:
-
-```json
-{
-  "provider": "razorpay",
-  "merchantOrderId": "hrms-invoice-5821",
-  "amountMinor": 129900,
-  "currency": "INR",
-  "customer": { "id": "employee-42", "phone": "+919876543210" },
-  "returnUrl": "https://hrms.example.com/payments/return"
-}
+```powershell
+mvn -f backend/pom.xml test
 ```
 
-`amountMinor` is paise (₹1,299.00 is `129900`). Determine the payable amount in the calling product's trusted backend; never accept a browser-supplied amount as authoritative. Use an opaque `merchantOrderId` without personal information. The return URL hostname must be in that tenant's `TENANT_RETURN_HOSTS` allowlist.
+The Java and Docker toolchains were unavailable in the initial build environment, so this project has not yet been compiled or container-started there. Do not use this milestone for live transactions.
 
-Response includes the provider checkout fields: Razorpay `keyId` and `orderId`, or Cashfree `paymentSessionId` and environment. Pass these to the provider's official hosted checkout SDK. Never expose the tenant API key or provider secret to a browser or mobile app.
+## Initial API
 
-### Confirm and query
+- `POST /api/v1/auth/signup` — create a merchant workspace and test key (returned once).
+- `POST /api/v1/auth/login` — obtain a short-lived portal JWT.
+- `POST /api/v1/orders` — create an INR sandbox order. Use a portal JWT or test API secret in `Authorization: Bearer ...`, plus a stable `X-Idempotency-Key`. `amount` is an integer number of paise.
+- `GET /api/v1/orders` and `GET /api/v1/orders/{id}` — list/query orders scoped to the authenticated merchant.
+- `POST /api/v1/orders/{id}/sandbox-result?outcome=SUCCESS` — simulate a test outcome. Supported outcomes include `SUCCESS`, `FAILED`, `TIMEOUT`, `DECLINED`, `AUTHORIZED`, `CAPTURED`, `REFUND`, `PARTIAL_REFUND`, and `WEBHOOK_FAILURE`. This route only accepts TEST credentials.
 
-- `POST /v1/orders/:id/confirm` verifies Razorpay Checkout's signature and then fetches the payment from Razorpay before marking it paid.
-- `GET /v1/orders/:id` returns the tenant's order status and reconciles an old pending order with the provider at most once per 15 seconds.
-- Cashfree confirmation is based on its signed webhook or server-side order status, not the browser redirect.
+## Repository map
 
-### Webhooks
+- `backend/api-gateway`: Spring Boot API foundation, identity, merchant and sandbox order domains.
+- `frontend/merchant-portal`: React/TypeScript test merchant workspace.
+- `ai/`, `sdk/`, `infrastructure/`, `docs/`: platform expansion areas; not all services are implemented yet.
+- `src/`, `public/`, `db/`: preserved earlier Node.js provider-connector prototype. It is separate from the new Spring/React platform and is not evidence that the new platform has provider integrations.
 
-Register these public HTTPS URLs in each provider dashboard:
+## Build status
 
-- `POST <PUBLIC_BASE_URL>/webhooks/razorpay/<TENANT_SLUG>`
-- `POST <PUBLIC_BASE_URL>/webhooks/cashfree/<TENANT_SLUG>`
+Implemented in this milestone: signup/login, password hashing, test API key hashing, merchant isolation, idempotency constraints/serialization, INR minor-unit order storage, sandbox outcomes, payment state machine, initial merchant UI, PostgreSQL migrations, and local compose topology.
 
-Subscribe to the payment captured/paid events. Keep the body raw through signature verification. This service acknowledges duplicate deliveries idempotently; the provider should retry non-2xx responses.
+Not implemented yet: OTP delivery/verification, full KYC/KYB and document review, team RBAC management, production keys, licensed provider adapters, hosted checkout/provider tokenization, real webhooks, ledger, fees/tax, refunds, settlements, reconciliation, disputes, risk, fraud, AI, SDKs, admin portal, and production operations/security review. Live payments remain disabled.
 
-## Client product flow
-
-1. HRMS, astrology app, or another product backend calculates the charge and calls TechNext Pay with its tenant key and an idempotency key.
-2. The client UI launches the official Razorpay or Cashfree checkout using the returned checkout fields.
-3. The product backend receives the provider webhook directly at TechNext Pay or checks `GET /v1/orders/:id` before fulfilling access, subscriptions, reports, or invoices.
-4. The product backend accepts a signed TechNext Pay event or reconciles with `GET /v1/orders/:id`. Fulfilment is idempotent in the product database. A redirect or client-side callback alone never proves payment.
-
-See [the integration guide](docs/INTEGRATION.md) and [the go-live checklist](docs/GO-LIVE.md).
