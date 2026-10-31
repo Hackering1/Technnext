@@ -27,6 +27,12 @@ mvn -f backend/pom.xml test
 
 The Java and Docker toolchains were unavailable in the initial build environment, so this project has not yet been compiled or container-started there. Do not use this milestone for live transactions.
 
+## Render test deployment
+
+`render-platform.yaml` defines separate free Docker web services for the Spring API and React portal. It references the existing **test-only** `technext-pay-test-db` PostgreSQL and `technext-pay-test-redis` Key Value resources; the platform tables use a separate `platform_` name prefix. In Render, create a Blueprint from this repository's `codex/technext-pay-platform-phase1` branch and set Blueprint Path to `technext-pay/render-platform.yaml`. Review the planned resources, then apply the Blueprint. This is an isolated sandbox deployment and does not modify the old Node service.
+
+The expected API and portal hosts are `https://technext-pay-platform-api.onrender.com` and `https://technext-pay-platform-frontend.onrender.com`. Render free web services sleep when idle, free Postgres expires after 30 days, and free Redis is ephemeral; use only for evaluation. The free web services communicate with the API through its public test URL because Render free web services cannot receive private-network requests. The first API request can be delayed by a cold start.
+
 ## Initial API
 
 - `POST /api/v1/auth/signup` — create a merchant workspace and test key (returned once).
