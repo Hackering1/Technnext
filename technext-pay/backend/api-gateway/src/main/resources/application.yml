@@ -10,6 +10,7 @@ spring:
   flyway.enabled: true
   data.redis.url: ${REDIS_URL:redis://localhost:6379}
   kafka.bootstrap-servers: ${KAFKA_BROKERS:localhost:9092}
+  kafka.admin.auto-create: false
 server:
   port: ${PORT:8080}
   forward-headers-strategy: framework
