@@ -30,6 +30,8 @@ services:
           property: connectionString
       - key: JWT_SECRET
         generateValue: true
+      - key: SPRING_FLYWAY_BASELINE_ON_MIGRATE
+        value: "true"
       - key: MANAGEMENT_HEALTH_KAFKA_ENABLED
         value: "false"
       - key: MANAGEMENT_HEALTH_REDIS_ENABLED
