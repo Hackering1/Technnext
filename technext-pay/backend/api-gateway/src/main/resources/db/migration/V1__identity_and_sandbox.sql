@@ -29,7 +29,7 @@ CREATE TABLE api_credentials (
 );
 CREATE INDEX ix_api_credentials_merchant ON api_credentials(merchant_id);
 
-CREATE TABLE payment_orders (
+CREATE TABLE platform_payment_orders (
   id UUID PRIMARY KEY,
   merchant_id UUID NOT NULL REFERENCES merchants(id),
   amount_minor BIGINT NOT NULL CHECK(amount_minor >= 100),
@@ -40,7 +40,7 @@ CREATE TABLE payment_orders (
   environment VARCHAR(12) NOT NULL CHECK(environment = 'TEST'),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   version BIGINT NOT NULL DEFAULT 0,
-  CONSTRAINT uq_orders_merchant_idempotency UNIQUE(merchant_id,idempotency_key)
+  CONSTRAINT uq_platform_orders_idempotency UNIQUE(merchant_id,idempotency_key)
 );
-CREATE INDEX ix_payment_orders_merchant_created ON payment_orders(merchant_id,created_at DESC);
+CREATE INDEX ix_platform_orders_merchant_created ON platform_payment_orders(merchant_id,created_at DESC);
 
