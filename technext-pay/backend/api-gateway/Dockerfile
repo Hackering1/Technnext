@@ -8,7 +8,9 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build /workspace/backend/api-gateway/target/api-gateway-0.1.0.jar app.jar
+COPY backend/api-gateway/start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 USER app
 EXPOSE 8080
-ENTRYPOINT ["java","-XX:MaxRAMPercentage=75.0","-jar","/app/app.jar"]
+ENTRYPOINT ["/app/start.sh"]
 
