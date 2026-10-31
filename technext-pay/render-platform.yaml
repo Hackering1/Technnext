@@ -1,0 +1,51 @@
+# Separate free TEST deployment for the Spring/React platform PR.
+# This deliberately reuses the existing test-only Render Postgres and Key Value
+# resources from render.yaml; it does not create a second free database.
+services:
+  - type: web
+    name: technext-pay-platform-api
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./technext-pay/backend/api-gateway/Dockerfile
+    dockerContext: ./technext-pay
+    healthCheckPath: /actuator/health/readiness
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: technext-pay-test-db
+          property: connectionString
+      - key: DATABASE_USER
+        fromDatabase:
+          name: technext-pay-test-db
+          property: user
+      - key: DATABASE_PASSWORD
+        fromDatabase:
+          name: technext-pay-test-db
+          property: password
+      - key: REDIS_URL
+        fromService:
+          name: technext-pay-test-redis
+          type: keyvalue
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MANAGEMENT_HEALTH_KAFKA_ENABLED
+        value: "false"
+      - key: MANAGEMENT_HEALTH_REDIS_ENABLED
+        value: "false"
+  - type: web
+    name: technext-pay-platform-frontend
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./technext-pay/frontend/merchant-portal/Dockerfile
+    dockerContext: ./technext-pay/frontend/merchant-portal
+    envVars:
+      - key: PORT
+        value: "10000"
+      - key: API_SCHEME
+        value: https
+      - key: API_HOST
+        value: technext-pay-platform-api.onrender.com
+
