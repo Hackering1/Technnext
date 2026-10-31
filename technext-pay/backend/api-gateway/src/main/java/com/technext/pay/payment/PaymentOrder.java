@@ -1,6 +1,6 @@
 package com.technext.pay.payment;
 import com.technext.pay.identity.Merchant; import jakarta.persistence.*; import java.time.Instant; import java.util.UUID;
-@Entity @Table(name="payment_orders",uniqueConstraints=@UniqueConstraint(name="uq_orders_merchant_idempotency",columnNames={"merchant_id","idempotency_key"}))
+@Entity @Table(name="platform_payment_orders",uniqueConstraints=@UniqueConstraint(name="uq_platform_orders_idempotency",columnNames={"merchant_id","idempotency_key"}))
 public class PaymentOrder {
  @Id private UUID id; @ManyToOne(fetch=FetchType.LAZY,optional=false) @JoinColumn(name="merchant_id",nullable=false) private Merchant merchant;
  @Column(name="amount_minor",nullable=false) private long amountMinor; @Column(nullable=false,length=3) private String currency;
